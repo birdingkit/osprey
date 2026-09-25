@@ -1,7 +1,7 @@
 [project]
 name = "osprey"
 version = "0.1.0"
-description = "Move wildlife photos into A_sharp / B_soft / C_blurry / D_no_animal folders by the sharpness of the animal"
+description = "Rename wildlife photos so each burst sits together, sharpest animal first"
 authors = [
     { name = "siansiansu" }
 ]

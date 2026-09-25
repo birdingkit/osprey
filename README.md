@@ -1,6 +1,6 @@
 # osprey
 
-Sort a folder of wildlife photos (birds, dolphins, whales) by how sharp the animal is. Each photo moves into `A_sharp/`, `B_soft/`, `C_blurry/` or `D_no_animal/` inside the folder, together with its RAW and XMP files.
+Sort a folder of wildlife photos (birds, dolphins, whales) by how sharp the animal is. osprey splits the photos into bursts and renames them in place, so each burst sits together with its sharpest frame first. RAW and XMP files are renamed along with their photo.
 
 ## Install
 
@@ -21,26 +21,27 @@ uv run osprey ~/Pictures/2026-08-22
 ```
 
 ```
-[1/3] DSC06266.JPG 60.3 → B_soft/
-[2/3] DSC07300.JPG 70.2 → A_sharp/
-[3/3] DSC07714.JPG 64.1 → A_sharp/
-3 photos in 1.8s: 2 A_sharp, 1 B_soft, 0 C_blurry, 0 D_no_animal
+[1/5] DSC05430.JPG 72.5 → 0001-01_DSC05430.JPG
+[2/5] DSC05431.JPG 68.5 → 0001-02_DSC05431.JPG
+[3/5] DSC05429.JPG 66.7 → 0001-03_DSC05429.JPG
+[4/5] DSC05432.JPG 43.8 → 0001-04_DSC05432.JPG
+[5/5] DSC05433.JPG 38.8 → 0001-05_DSC05433.JPG
+5 photos in 1 bursts in 2.5s
 ```
 
-Subfolders are searched too, but everything lands in the four folders at the top. Photos already in those folders are left alone, so running again only sorts new photos. A photo whose name is already taken in its target folder is skipped.
+`0001-03_DSC05429.JPG` is burst 1, third sharpest. Sorted by name, each burst sits together with its best frame first, so you can flip through a day without jumping between folders. The number is animal sharpness (0–100); `-` means no bird, dolphin or whale was found, and those frames go last in their burst.
 
-| Folder | Animal sharpness (0–100) |
-|---|---|
-| `A_sharp` | 61+ |
-| `B_soft` | 40–61 |
-| `C_blurry` | under 40 |
-| `D_no_animal` | no bird, dolphin or whale found |
+Frames less than 1 s apart (by EXIF capture time) form one burst. A burst never spans subfolders, and a photo without a capture date is a burst of its own.
 
-The letter prefix keeps the folders in best-first order in Finder.
+Photos already renamed are left alone, so running again only sorts new photos, numbered after the earlier bursts. A photo whose new name is already taken is skipped.
 
-Files sharing the photo's name move with it: `DSC0001.JPG`, `DSC0001.ARW` and `DSC0001.ARW.xmp` stay together.
+Files sharing the photo's name are renamed with it: `DSC0001.JPG`, `DSC0001.ARW` and `DSC0001.ARW.xmp` stay together.
 
-osprey moves files, it never deletes them. To undo, move the photos back out of the four folders.
+osprey renames files, it never moves or deletes them. To undo, strip the prefix:
+
+```sh
+for f in **/[0-9][0-9][0-9][0-9]*-[0-9][0-9]*_*(N); do mv "$f" "${f:h}/${${f:t}#*_}"; done  # zsh
+```
 
 ## How it works
 
@@ -51,5 +52,5 @@ A photo takes about 0.5 s on an M4 Mac.
 ## Limits
 
 - Only birds, dolphins and whales are looked for. Add more names to `ANIMALS` in `src/osprey/detect.py`.
-- Very faint or distant animals, such as a pale seabird soaring against grey sky, can land in `D_no_animal`. Check that folder before deleting anything.
-- The sharpness cut-offs were set on a handful of Sony A7 IV frames and may need adjusting for other cameras or subjects.
+- Very faint or distant animals, such as a pale seabird soaring against grey sky, can be missed and get `-`. Check the last frames of a burst before deleting anything.
+- The 1 s burst gap was set on Sony A7 IV bursts (8 fps). Change `BURST_GAP` in `src/osprey/cli.py` for other cameras or shooting styles.

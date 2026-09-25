@@ -1,33 +1,40 @@
-"""osprey: move wildlife photos into A_sharp / B_soft / C_blurry / D_no_animal folders by how sharp the animal is."""
+"""osprey: rename wildlife photos so each burst sits together, sharpest animal first."""
 
 import argparse
+import re
 import sys
 import time
-from collections import Counter, defaultdict
+from collections import defaultdict
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from itertools import islice
 from pathlib import Path
 
 import huggingface_hub
 import torch
 import transformers
-from PIL import Image, ImageOps
+from PIL import ExifTags, Image, ImageOps
 
 from .detect import AnimalDetector
-from .quality import LABELS, animal_sharpness, quality_label
+from .quality import animal_sharpness
 
 PHOTO_SUFFIXES = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
-NO_ANIMAL = "D_no_animal"
-FOLDERS = (*LABELS, NO_ANIMAL)
+# Frames closer than this are one burst. Sony A7 IV bursts run 8 fps (0.125 s); re-pressing
+# the shutter on the same scene leaves 0.5-2 s gaps, and 1 s splits those best on real outings.
+BURST_GAP = 1.0
+# 0012-03_DSC07300.JPG: burst 12, third sharpest. Photos named like this were sorted on an earlier run.
+SORTED = re.compile(r"^(\d{4,})-\d{2,}_")
 
 
 @dataclass
 class Shot:
-    """One photo plus every file sharing its name (RAW, XMP), which move together."""
+    """One photo plus every file sharing its name (RAW, XMP), which are renamed together."""
 
     photo: Path
     files: list[Path]
+    taken: float | None  # capture time in seconds, None if the photo has no EXIF date
 
 
 def main() -> None:
@@ -36,27 +43,33 @@ def main() -> None:
     huggingface_hub.logging.set_verbosity_error()
     transformers.logging.disable_progress_bar()
     transformers.logging.set_verbosity_error()  # e.g. SAM 2 loads from a video checkpoint by design
-    shots = _shots(args.folder)
-    if not shots:
-        sys.exit(f"No photos in {args.folder}")
+    shots, first_burst = _shots(args.folder)
+    bursts = _bursts(shots)
+    if not bursts:
+        sys.exit(f"No unsorted photos in {args.folder}")
 
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     detector = AnimalDetector(device)
 
-    counts = Counter()
+    total = sum(map(len, bursts))
+    done = 0
     start = time.time()
-    for i, (shot, image, pixels) in enumerate(_load_ahead(shots, detector.shrink), 1):
-        score, folder = "-", NO_ANIMAL
-        if animal := detector(image, pixels):
-            score = animal_sharpness(image, animal)
-            folder = quality_label(score)
-        moved = _move(shot, args.folder / folder)
-        counts[folder] += moved
-        status = f"→ {folder}/" if moved else f"skipped: {folder}/{shot.photo.name} exists"
-        print(f"[{i}/{len(shots)}] {shot.photo.name} {score} {status}", flush=True)
+    loaded = _load_ahead([shot for burst in bursts for shot in burst], detector.shrink)
+    for number, burst in enumerate(bursts, first_burst):
+        scored = []
+        for shot, image, pixels in islice(loaded, len(burst)):
+            animal = detector(image, pixels)
+            scored.append((shot, animal_sharpness(image, animal) if animal else None))
+        # Sharpest first; frames with no animal go last; ties keep capture order
+        scored.sort(key=lambda pair: (pair[1] is None, -(pair[1] or 0)))
+        width = max(2, len(str(len(burst))))
+        for rank, (shot, score) in enumerate(scored, 1):
+            done += 1
+            prefix = f"{number:04d}-{rank:0{width}d}_"
+            status = f"→ {prefix}{shot.photo.name}" if _rename(shot, prefix) else "skipped: name taken"
+            print(f"[{done}/{total}] {shot.photo.name} {'-' if score is None else score} {status}", flush=True)
 
-    summary = ", ".join(f"{counts[f]} {f}" for f in FOLDERS)
-    print(f"{len(shots)} photos in {time.time() - start:.1f}s: {summary}")
+    print(f"{total} photos in {len(bursts)} bursts in {time.time() - start:.1f}s")
 
 
 def _parse_args() -> argparse.Namespace:
@@ -65,30 +78,65 @@ def _parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def _shots(folder: Path) -> list[Shot]:
-    """Photos under `folder`, each grouped with its same-name files; already-sorted folders are skipped."""
+def _shots(folder: Path) -> tuple[list[Shot], int]:
+    """Unsorted photos under `folder`, each grouped with its same-name files, and the first burst number
+    after those used by earlier runs, so new bursts sort after them."""
     groups: dict[tuple[Path, str], list[Path]] = defaultdict(list)
+    last_burst = 0
     for root, dirs, files in folder.walk():
-        # Skip hidden folders and, at the top, the folders earlier runs sorted into
-        dirs[:] = sorted(d for d in dirs if not d.startswith(".") and not (root == folder and d in FOLDERS))
+        dirs[:] = sorted(d for d in dirs if not d.startswith("."))
         for name in sorted(files):
-            if not name.startswith("."):  # ._DSC0001.JPG is a macOS resource fork
+            if name.startswith("."):  # ._DSC0001.JPG is a macOS resource fork
+                continue
+            if sorted_name := SORTED.match(name):
+                last_burst = max(last_burst, int(sorted_name[1]))
+            else:
                 # DSC0001.JPG, DSC0001.ARW and DSC0001.ARW.xmp share the key DSC0001
                 groups[root, name.partition(".")[0]].append(root / name)
     shots = []
     for files in groups.values():
         if photo := next((f for f in files if f.suffix.lower() in PHOTO_SUFFIXES), None):
-            shots.append(Shot(photo, files))
-    return shots
+            shots.append(Shot(photo, files, _capture_time(photo)))
+    return shots, last_burst + 1
 
 
-def _move(shot: Shot, dest: Path) -> bool:
-    """Move all of the shot's files into `dest`; False (nothing moved) if any name is already taken."""
-    if any((dest / f.name).exists() for f in shot.files):
+def _capture_time(photo: Path) -> float | None:
+    with Image.open(photo) as image:
+        exif = image.getexif().get_ifd(ExifTags.IFD.Exif)
+    subsec = str(exif.get(ExifTags.Base.SubsecTimeOriginal, "")).strip()
+    try:
+        # Camera clock has no zone; only gaps between frames matter, so read it as UTC
+        taken = datetime.strptime(exif[ExifTags.Base.DateTimeOriginal], "%Y:%m:%d %H:%M:%S").replace(tzinfo=UTC)
+    except (KeyError, ValueError):  # no date, or a blank one like 0000:00:00 00:00:00
+        return None
+    return taken.timestamp() + float(f"0.{subsec or 0}")
+
+
+def _bursts(shots: list[Shot]) -> list[list[Shot]]:
+    """Shots in capture order, split wherever the gap reaches BURST_GAP; a burst never spans folders."""
+    shots = sorted(shots, key=lambda s: (s.photo.parent, s.taken is None, s.taken or 0, s.photo.name))
+    bursts: list[list[Shot]] = []
+    for previous, shot in zip([None, *shots], shots):
+        same_burst = (
+            previous is not None
+            and previous.photo.parent == shot.photo.parent
+            and previous.taken is not None
+            and shot.taken is not None
+            and shot.taken - previous.taken < BURST_GAP
+        )
+        if same_burst:
+            bursts[-1].append(shot)
+        else:
+            bursts.append([shot])
+    return bursts
+
+
+def _rename(shot: Shot, prefix: str) -> bool:
+    """Put `prefix` in front of all the shot's file names; False (nothing renamed) if any new name is taken."""
+    if any(f.with_name(prefix + f.name).exists() for f in shot.files):
         return False
-    dest.mkdir(exist_ok=True)
     for f in shot.files:
-        f.rename(dest / f.name)
+        f.rename(f.with_name(prefix + f.name))
     return True
 
 

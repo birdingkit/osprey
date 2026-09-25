@@ -3,7 +3,7 @@ from PIL import Image
 from scipy.ndimage import gaussian_filter
 
 from osprey.detect import Animal
-from osprey.quality import animal_sharpness, quality_label, sharpness
+from osprey.quality import animal_sharpness, sharpness
 
 
 def _checkerboard(contrast: float) -> np.ndarray:
@@ -33,13 +33,6 @@ def test_sharpness_mask_ignoresBlurryBackground():
 
 def _animal(box, shape):
     return Animal(box=box, mask=np.ones(shape, dtype=bool))
-
-
-def test_qualityLabel_cutoffs():
-    # trace: sharp >= 61, soft >= 40
-    assert quality_label(61.4) == "A_sharp"
-    assert quality_label(60.3) == "B_soft"
-    assert quality_label(30.0) == "C_blurry"
 
 
 def test_animalSharpness_largeAnimal_judgedAtMaxSide():
