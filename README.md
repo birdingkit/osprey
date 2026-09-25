@@ -47,10 +47,11 @@ for f in **/[0-9][0-9][0-9][0-9]*-[0-9][0-9]*_*(N); do mv "$f" "${f:h}/${${f:t}#
 
 [OWL-ViT](https://huggingface.co/google/owlvit-base-patch32) finds birds, dolphins and whales from text prompts, and [SAM 2](https://huggingface.co/facebook/sam2.1-hiera-tiny) outlines the largest one. Sharpness uses the re-blur metric of Crete et al. (2007) on the animal's pixels, so a soft background does not count against the photo.
 
-A photo takes about 0.5 s on an M4 Mac.
+A photo takes about 0.5 s on an M4 Mac: a day of 1414 photos took 11 minutes.
 
 ## Limits
 
 - Only birds, dolphins and whales are looked for. Add more names to `ANIMALS` in `src/osprey/detect.py`.
 - Very faint or distant animals, such as a pale seabird soaring against grey sky, can be missed and get `-`. Check the last frames of a burst before deleting anything.
+- Only sharpness is ranked, not framing. A sharp bird cut off by the frame edge can still come first.
 - The 1 s burst gap was set on Sony A7 IV bursts (8 fps). Change `BURST_GAP` in `src/osprey/cli.py` for other cameras or shooting styles.
