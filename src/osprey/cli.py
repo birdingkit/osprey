@@ -1,31 +1,21 @@
-"""osprey: rename wildlife photos so each burst sits together, sharpest animal first."""
+"""osprey: rename photos so each burst of frames sits together."""
 
 import argparse
 import re
 import sys
-import time
 from collections import defaultdict
-from collections.abc import Callable, Iterator
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from itertools import islice
 from pathlib import Path
 
-import huggingface_hub
-import torch
-import transformers
-from PIL import ExifTags, Image, ImageOps
-
-from .detect import AnimalDetector
-from .quality import animal_sharpness
+from PIL import ExifTags, Image
 
 PHOTO_SUFFIXES = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 # Frames closer than this are one burst. Sony A7 IV bursts run 8 fps (0.125 s); re-pressing
 # the shutter on the same scene leaves 0.5-2 s gaps, and 1 s splits those best on real outings.
 BURST_GAP = 1.0
-# 0012-03_DSC07300.JPG: burst 12, third sharpest. Photos named like this were sorted on an earlier run.
-SORTED = re.compile(r"^(\d{4,})-\d{2,}_")
+# 0012_DSC07300.JPG: burst 12. Photos named like this were sorted on an earlier run.
+SORTED = re.compile(r"^(\d{4})_")
 
 
 @dataclass
@@ -39,37 +29,20 @@ class Shot:
 
 def main() -> None:
     args = _parse_args()
-    # Public model weights need no token; silence the Hub's nag about it.
-    huggingface_hub.logging.set_verbosity_error()
-    transformers.logging.disable_progress_bar()
-    transformers.logging.set_verbosity_error()  # e.g. SAM 2 loads from a video checkpoint by design
     shots, first_burst = _shots(args.folder)
     bursts = _bursts(shots)
     if not bursts:
         sys.exit(f"No unsorted photos in {args.folder}")
 
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-    detector = AnimalDetector(device)
-
-    total = sum(map(len, bursts))
     done = 0
-    start = time.time()
-    loaded = _load_ahead([shot for burst in bursts for shot in burst], detector.shrink)
     for number, burst in enumerate(bursts, first_burst):
-        scored = []
-        for shot, image, pixels in islice(loaded, len(burst)):
-            animal = detector(image, pixels)
-            scored.append((shot, animal_sharpness(image, animal) if animal else None))
-        # Sharpest first; frames with no animal go last; ties keep capture order
-        scored.sort(key=lambda pair: (pair[1] is None, -(pair[1] or 0)))
-        width = max(2, len(str(len(burst))))
-        for rank, (shot, score) in enumerate(scored, 1):
+        prefix = f"{number:04d}_"
+        for shot in burst:
             done += 1
-            prefix = f"{number:04d}-{rank:0{width}d}_"
             status = f"→ {prefix}{shot.photo.name}" if _rename(shot, prefix) else "skipped: name taken"
-            print(f"[{done}/{total}] {shot.photo.name} {'-' if score is None else score} {status}", flush=True)
+            print(f"[{done}/{len(shots)}] {shot.photo.name} {status}")
 
-    print(f"{total} photos in {len(bursts)} bursts in {time.time() - start:.1f}s")
+    print(f"{len(shots)} photos in {len(bursts)} bursts")
 
 
 def _parse_args() -> argparse.Namespace:
@@ -138,23 +111,3 @@ def _rename(shot: Shot, prefix: str) -> bool:
     for f in shot.files:
         f.rename(f.with_name(prefix + f.name))
     return True
-
-
-def _load_ahead(shots: list[Shot], shrink: Callable) -> Iterator[tuple[Shot, Image.Image, torch.Tensor]]:
-    """Decode and shrink the next photo on a worker thread while the GPU handles the current one."""
-    with ThreadPoolExecutor(1) as pool:
-        future = pool.submit(_load, shots[0], shrink)
-        for next_shot in [*shots[1:], None]:
-            loaded = future.result()
-            if next_shot:
-                future = pool.submit(_load, next_shot, shrink)
-            yield loaded
-
-
-def _load(shot: Shot, shrink: Callable) -> tuple[Shot, Image.Image, torch.Tensor]:
-    image = Image.open(shot.photo)
-    image.load()  # decodes pixels and closes the file
-    if image.mode != "RGB":
-        image = image.convert("RGB")
-    ImageOps.exif_transpose(image, in_place=True)
-    return shot, image, shrink(image)

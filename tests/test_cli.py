@@ -31,13 +31,13 @@ def test_shots_groupsSameNameFilesAndSkipsRenamedAndHidden(tmp_path):
     _photo(tmp_path / "DSC0001.JPG")
     _photo(tmp_path / "day2" / "DSC0002.jpg")
     _photo(tmp_path / ".thumbnails" / "DSC0006.JPG")  # hidden folder
-    _photo(tmp_path / "0003-01_DSC0005.JPG")  # renamed on an earlier run
+    _photo(tmp_path / "0003_DSC0005.JPG")  # renamed on an earlier run
     _touch(
         tmp_path / "DSC0001.ARW",
         tmp_path / "DSC0001.ARW.xmp",
         tmp_path / "DSC0003.ARW",  # RAW without a photo: not judged
         tmp_path / "._DSC0004.JPG",  # macOS resource fork
-        tmp_path / "0003-01_DSC0005.ARW",
+        tmp_path / "0003_DSC0005.ARW",
     )
     shots, _ = _shots(tmp_path)
     assert [s.photo.relative_to(tmp_path) for s in shots] == [Path("DSC0001.JPG"), Path("day2/DSC0002.jpg")]
@@ -75,17 +75,20 @@ def test_bursts_splitAtGapFolderAndMissingTime():
 
 def test_shots_firstBurst_continuesAfterEarlierRuns(tmp_path):
     assert _shots(tmp_path)[1] == 1
-    _touch(tmp_path / "0009-02_DSC0001.JPG", tmp_path / "sub" / "0012-01_DSC0002.ARW")
+    _touch(tmp_path / "0009_DSC0001.JPG", tmp_path / "sub" / "0012_DSC0002.ARW")
     _photo(tmp_path / "DSC_0003.JPG")  # underscore but no burst prefix
-    assert _shots(tmp_path)[1] == 13
+    _photo(tmp_path / "20260822_101500.jpg")  # phone-style date name, not a burst number
+    shots, first_burst = _shots(tmp_path)
+    assert first_burst == 13
+    assert sorted(s.photo.name for s in shots) == ["20260822_101500.jpg", "DSC_0003.JPG"]
 
 
 def test_rename_takesSidecarsAndRefusesToOverwrite(tmp_path):
     photo, raw = tmp_path / "DSC0001.JPG", tmp_path / "DSC0001.ARW"
     _touch(photo, raw)
-    assert _rename(Shot(photo, [photo, raw], None), "0001-01_")
-    assert sorted(p.name for p in tmp_path.iterdir()) == ["0001-01_DSC0001.ARW", "0001-01_DSC0001.JPG"]
+    assert _rename(Shot(photo, [photo, raw], None), "0001_")
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["0001_DSC0001.ARW", "0001_DSC0001.JPG"]
 
     _touch(photo)
-    assert not _rename(Shot(photo, [photo], None), "0001-01_")
+    assert not _rename(Shot(photo, [photo], None), "0001_")
     assert photo.exists()
