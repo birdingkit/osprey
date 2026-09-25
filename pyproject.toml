@@ -1,7 +1,7 @@
 [project]
 name = "osprey"
 version = "0.1.0"
-description = "Move bird photos into sharp / soft / blurry / no_bird folders by the sharpness of the bird"
+description = "Move wildlife photos into A_sharp / B_soft / C_blurry / D_no_animal folders by the sharpness of the animal"
 authors = [
     { name = "siansiansu" }
 ]
@@ -10,7 +10,7 @@ dependencies = [
     "pillow==12.3.0",
     "scipy==1.18.1",
     "torch==2.11.0",
-    "torchvision==0.26.0",
+    "transformers==5.5.0",
 ]
 
 [project.scripts]

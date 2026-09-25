@@ -1,4 +1,4 @@
-"""osprey: move bird photos into A_sharp / B_soft / C_blurry / D_no_bird folders by how sharp the bird is."""
+"""osprey: move wildlife photos into A_sharp / B_soft / C_blurry / D_no_animal folders by how sharp the animal is."""
 
 import argparse
 import sys
@@ -9,15 +9,17 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
+import huggingface_hub
 import torch
+import transformers
 from PIL import Image, ImageOps
 
-from .detect import BirdDetector
-from .quality import LABELS, bird_sharpness, quality_label
+from .detect import AnimalDetector
+from .quality import LABELS, animal_sharpness, quality_label
 
 PHOTO_SUFFIXES = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
-NO_BIRD = "D_no_bird"
-FOLDERS = (*LABELS, NO_BIRD)
+NO_ANIMAL = "D_no_animal"
+FOLDERS = (*LABELS, NO_ANIMAL)
 
 
 @dataclass
@@ -30,19 +32,22 @@ class Shot:
 
 def main() -> None:
     args = _parse_args()
+    # Public model weights need no token; silence the Hub's nag about it.
+    huggingface_hub.logging.set_verbosity_error()
+    transformers.logging.disable_progress_bar()
     shots = _shots(args.folder)
     if not shots:
         sys.exit(f"No photos in {args.folder}")
 
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-    detector = BirdDetector(device)
+    detector = AnimalDetector(device)
 
     counts = Counter()
     start = time.time()
-    for i, (shot, image, shrunk) in enumerate(_load_ahead(shots, detector.shrink), 1):
-        score, folder = "-", NO_BIRD
-        if bird := detector(shrunk):
-            score = bird_sharpness(image, bird)
+    for i, (shot, image, pixels) in enumerate(_load_ahead(shots, detector.shrink), 1):
+        score, folder = "-", NO_ANIMAL
+        if animal := detector(image, pixels):
+            score = animal_sharpness(image, animal)
             folder = quality_label(score)
         moved = _move(shot, args.folder / folder)
         counts[folder] += moved
@@ -86,7 +91,7 @@ def _move(shot: Shot, dest: Path) -> bool:
     return True
 
 
-def _load_ahead(shots: list[Shot], shrink: Callable) -> Iterator[tuple[Shot, Image.Image, tuple]]:
+def _load_ahead(shots: list[Shot], shrink: Callable) -> Iterator[tuple[Shot, Image.Image, torch.Tensor]]:
     """Decode and shrink the next photo on a worker thread while the GPU handles the current one."""
     with ThreadPoolExecutor(1) as pool:
         future = pool.submit(_load, shots[0], shrink)
@@ -97,7 +102,7 @@ def _load_ahead(shots: list[Shot], shrink: Callable) -> Iterator[tuple[Shot, Ima
             yield loaded
 
 
-def _load(shot: Shot, shrink: Callable) -> tuple[Shot, Image.Image, tuple]:
+def _load(shot: Shot, shrink: Callable) -> tuple[Shot, Image.Image, torch.Tensor]:
     image = Image.open(shot.photo)
     image.load()  # decodes pixels and closes the file
     if image.mode != "RGB":

@@ -2,8 +2,8 @@ import numpy as np
 from PIL import Image
 from scipy.ndimage import gaussian_filter
 
-from osprey.detect import Bird
-from osprey.quality import bird_sharpness, quality_label, sharpness
+from osprey.detect import Animal
+from osprey.quality import animal_sharpness, quality_label, sharpness
 
 
 def _checkerboard(contrast: float) -> np.ndarray:
@@ -18,7 +18,7 @@ def test_sharpness_blurredImage_scoresLower():
     assert sharpness(blurred) < 40
 
 
-def test_sharpness_lowContrastBird_scoresSameAsHighContrast():
+def test_sharpness_lowContrastAnimal_scoresSameAsHighContrast():
     assert abs(sharpness(_checkerboard(20)) - sharpness(_checkerboard(120))) < 1
 
 
@@ -31,8 +31,8 @@ def test_sharpness_mask_ignoresBlurryBackground():
     assert sharpness(image, mask) > sharpness(image) + 10
 
 
-def _bird(box, shape):
-    return Bird(box=box, mask=np.ones(shape, dtype=bool))
+def _animal(box, shape):
+    return Animal(box=box, mask=np.ones(shape, dtype=bool))
 
 
 def test_qualityLabel_cutoffs():
@@ -42,8 +42,8 @@ def test_qualityLabel_cutoffs():
     assert quality_label(30.0) == "C_blurry"
 
 
-def test_birdSharpness_largeBird_judgedAtMaxSide():
+def test_animalSharpness_largeAnimal_judgedAtMaxSide():
     # trace: 2048 px box → resized to 1024 before scoring; a checkerboard stays sharp
     pixels = np.kron(_checkerboard(contrast=100), np.ones((8, 8))).astype(np.uint8)
     image = Image.fromarray(pixels).convert("RGB")
-    assert bird_sharpness(image, _bird((0, 0, 2048, 2048), (2048, 2048))) > 60
+    assert animal_sharpness(image, _animal((0, 0, 2048, 2048), (2048, 2048))) > 60

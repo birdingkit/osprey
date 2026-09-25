@@ -1,10 +1,10 @@
-"""Photo sharpness judged on the bird itself."""
+"""Photo sharpness judged on the animal itself."""
 
 import numpy as np
 from PIL import Image
 from scipy.ndimage import uniform_filter1d
 
-from .detect import Bird
+from .detect import Animal
 
 MAX_SIDE = 1024  # judge at screen-viewing scale, never upscale
 BLUR_WINDOW = 11
@@ -14,9 +14,9 @@ SHARP, SOFT = 60.0, 40.0
 LABELS = ("A_sharp", "B_soft", "C_blurry")  # letter prefix sorts folders best-first
 
 
-def bird_sharpness(image: Image.Image, bird: Bird) -> float:
-    """Sharpness of the bird's own pixels, judged at most MAX_SIDE across."""
-    crop, mask = image.crop(bird.box).convert("L"), bird.mask
+def animal_sharpness(image: Image.Image, animal: Animal) -> float:
+    """Sharpness of the animal's own pixels, judged at most MAX_SIDE across."""
+    crop, mask = image.crop(animal.box).convert("L"), animal.mask
     scale = min(1.0, MAX_SIDE / max(crop.size))
     if scale < 1:
         size = (round(crop.width * scale), round(crop.height * scale))
@@ -31,7 +31,7 @@ def quality_label(score: float) -> str:
 
 
 def sharpness(gray: np.ndarray, mask: np.ndarray | None = None) -> float:
-    """0-100, higher is sharper. `gray` is the bird crop, `mask` marks bird pixels.
+    """0-100, higher is sharper. `gray` is the animal crop, `mask` marks animal pixels.
 
     Re-blur metric (Crete et al. 2007, the one behind skimage.measure.blur_effect):
     blur the crop again and measure how much edge contrast is lost. Sharp edges

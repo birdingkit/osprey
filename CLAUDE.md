@@ -1,6 +1,6 @@
 # osprey
 
-Bird-photo sorter CLI: `src/osprey/` — `cli.py` (find photos + same-name sidecars, move into A_sharp/B_soft/C_blurry/D_no_bird), `detect.py` (Mask R-CNN bird box/mask), `quality.py` (masked re-blur sharpness).
+Bird-photo sorter CLI: `src/osprey/` — `cli.py` (find photos + same-name sidecars, move into A_sharp/B_soft/C_blurry/D_no_animal), `detect.py` (OWLv2 bird/dolphin/whale box + SAM mask), `quality.py` (masked re-blur sharpness).
 
 ## Build & Test
 
