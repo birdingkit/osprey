@@ -35,6 +35,7 @@ def main() -> None:
     # Public model weights need no token; silence the Hub's nag about it.
     huggingface_hub.logging.set_verbosity_error()
     transformers.logging.disable_progress_bar()
+    transformers.logging.set_verbosity_error()  # e.g. SAM 2 loads from a video checkpoint by design
     shots = _shots(args.folder)
     if not shots:
         sys.exit(f"No photos in {args.folder}")

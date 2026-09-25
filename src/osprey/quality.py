@@ -9,8 +9,9 @@ from .detect import Animal
 MAX_SIDE = 1024  # judge at screen-viewing scale, never upscale
 BLUR_WINDOW = 11
 # Label cut-offs. Calibrated on in-focus Sony A7 IV frames (58-70) vs the same
-# frames with Gaussian sigma=2 or 15 px motion blur (19-38).
-SHARP, SOFT = 60.0, 40.0
+# frames with Gaussian sigma=2 or 15 px motion blur (19-38). SHARP moved 60 -> 61 when SAM 2
+# masks lifted scores 1-2 points and put the known-soft DSC06266 at 60.3.
+SHARP, SOFT = 61.0, 40.0
 LABELS = ("A_sharp", "B_soft", "C_blurry")  # letter prefix sorts folders best-first
 
 

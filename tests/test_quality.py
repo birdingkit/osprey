@@ -36,9 +36,9 @@ def _animal(box, shape):
 
 
 def test_qualityLabel_cutoffs():
-    # trace: sharp >= 60, soft >= 40
+    # trace: sharp >= 61, soft >= 40
     assert quality_label(61.4) == "A_sharp"
-    assert quality_label(58.2) == "B_soft"
+    assert quality_label(60.3) == "B_soft"
     assert quality_label(30.0) == "C_blurry"
 
 
