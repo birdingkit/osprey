@@ -11,7 +11,7 @@ BLUR_WINDOW = 11
 # Label cut-offs. Calibrated on in-focus Sony A7 IV frames (58-70) vs the same
 # frames with Gaussian sigma=2 or 15 px motion blur (19-38).
 SHARP, SOFT = 60.0, 40.0
-LABELS = ("sharp", "soft", "blurry")
+LABELS = ("A_sharp", "B_soft", "C_blurry")  # letter prefix sorts folders best-first
 
 
 def bird_sharpness(image: Image.Image, bird: Bird) -> float:

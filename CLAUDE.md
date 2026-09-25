@@ -1,6 +1,6 @@
 # osprey
 
-Bird-photo sorter CLI: `src/osprey/` — `cli.py` (find photos + same-name sidecars, move into sharp/soft/blurry/no_bird), `detect.py` (Mask R-CNN bird box/mask), `quality.py` (masked re-blur sharpness).
+Bird-photo sorter CLI: `src/osprey/` — `cli.py` (find photos + same-name sidecars, move into A_sharp/B_soft/C_blurry/D_no_bird), `detect.py` (Mask R-CNN bird box/mask), `quality.py` (masked re-blur sharpness).
 
 ## Build & Test
 
@@ -8,7 +8,7 @@ Bird-photo sorter CLI: `src/osprey/` — `cli.py` (find photos + same-name sidec
 |---|---|
 | Lint | `uv run ruff check src tests && uv run ruff format --check src tests` |
 | Unit tests | `uv run pytest -q` |
-| End-to-end | `rm -rf /tmp/osprey-e2e && cp -R examples /tmp/osprey-e2e && uv run osprey /tmp/osprey-e2e` → DSC06266 Brown Booby `soft/`, DSC07300 Bridled Tern `sharp/`, DSC07714 Bulwer's Petrel `sharp/` (copy first: osprey moves files) |
+| End-to-end | `rm -rf /tmp/osprey-e2e && cp -R examples /tmp/osprey-e2e && uv run osprey /tmp/osprey-e2e` → DSC06266 Brown Booby `B_soft/`, DSC07300 Bridled Tern `A_sharp/`, DSC07714 Bulwer's Petrel `A_sharp/` (copy first: osprey moves files) |
 
 `examples/` photos are local only (gitignored, 56 MB).
 

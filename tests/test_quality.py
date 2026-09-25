@@ -37,9 +37,9 @@ def _bird(box, shape):
 
 def test_qualityLabel_cutoffs():
     # trace: sharp >= 60, soft >= 40
-    assert quality_label(61.4) == "sharp"
-    assert quality_label(58.2) == "soft"
-    assert quality_label(30.0) == "blurry"
+    assert quality_label(61.4) == "A_sharp"
+    assert quality_label(58.2) == "B_soft"
+    assert quality_label(30.0) == "C_blurry"
 
 
 def test_birdSharpness_largeBird_judgedAtMaxSide():

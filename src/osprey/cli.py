@@ -1,4 +1,4 @@
-"""osprey: move bird photos into sharp / soft / blurry / no_bird folders by how sharp the bird is."""
+"""osprey: move bird photos into A_sharp / B_soft / C_blurry / D_no_bird folders by how sharp the bird is."""
 
 import argparse
 import sys
@@ -16,7 +16,7 @@ from .detect import BirdDetector
 from .quality import LABELS, bird_sharpness, quality_label
 
 PHOTO_SUFFIXES = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
-NO_BIRD = "no_bird"
+NO_BIRD = "D_no_bird"
 FOLDERS = (*LABELS, NO_BIRD)
 
 
