@@ -1,0 +1,32 @@
+[project]
+name = "osprey"
+version = "0.1.0"
+description = "Sort bird photos by species (BioCLIP 2.5 + iNaturalist local species) and sharpness into a CSV"
+authors = [
+    { name = "siansiansu" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "open-clip-torch==3.3.0",
+    "pillow==12.3.0",
+    "requests==2.34.2",
+    "scipy==1.18.1",
+    "torch==2.11.0",
+    "torchvision==0.26.0",
+]
+
+[project.scripts]
+osprey = "osprey:main"
+
+[build-system]
+requires = ["uv_build>=0.12.18,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "ruff==0.16.8",
+]
+
+[tool.ruff]
+line-length = 120

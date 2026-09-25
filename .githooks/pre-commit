@@ -1,0 +1,33 @@
+#!/bin/sh
+# Block secrets, personal photos/output and local paths from reaching this public repo.
+# Enable once per clone: git config core.hooksPath .githooks
+set -eu
+
+fail() {
+  printf 'pre-commit: %s\n' "$1" >&2
+  exit 1
+}
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+if [ -z "$staged" ]; then exit 0; fi
+
+# 1. Photos, raw files, video and CSV output carry GPS and personal data.
+blocked=$(printf '%s\n' "$staged" | grep -iE '\.(jpe?g|png|tiff?|heic|arw|cr[23]|nef|dng|raf|orf|rw2|mp4|mov|csv|xmp)$' || true)
+if [ -n "$blocked" ]; then fail "photo/output files staged:
+$blocked"; fi
+
+# 2. Nothing large: model weights and photo dumps belong outside git.
+large=$(printf '%s\n' "$staged" | while IFS= read -r f; do
+  if [ "$(git cat-file -s ":$f")" -gt 1048576 ]; then echo "$f"; fi
+done)
+if [ -n "$large" ]; then fail "files over 1 MB staged:
+$large"; fi
+
+# 3. Absolute home paths leak usernames and folder names.
+paths=$(git diff --cached -U0 | grep -E '^\+[^+]' | grep -E '/(Users|home)/[A-Za-z0-9._-]+' || true)
+if [ -n "$paths" ]; then fail "absolute home path in staged changes:
+$paths"; fi
+
+# 4. Tokens and keys.
+command -v gitleaks >/dev/null || fail "gitleaks not installed (brew install gitleaks)"
+gitleaks git --staged --redact --no-banner --log-level warn . || fail "gitleaks found a possible secret"
