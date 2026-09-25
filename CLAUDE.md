@@ -1,6 +1,6 @@
 # osprey
 
-Bird-photo sorter CLI: `src/osprey/` — `cli.py` (pipeline, burst ranking, CSV), `detect.py` (Mask R-CNN bird box/mask), `quality.py` (masked re-blur sharpness, clipped-pixel exposure), `taxa.py` (iNaturalist local species, cached), `species.py` (BioCLIP 2.5 zero-shot over local species).
+Bird-photo sorter CLI: `src/osprey/` — `cli.py` (find photos + same-name sidecars, move into sharp/soft/blurry/no_bird), `detect.py` (Mask R-CNN bird box/mask), `quality.py` (masked re-blur sharpness).
 
 ## Build & Test
 
@@ -8,7 +8,7 @@ Bird-photo sorter CLI: `src/osprey/` — `cli.py` (pipeline, burst ranking, CSV)
 |---|---|
 | Lint | `uv run ruff check src tests && uv run ruff format --check src tests` |
 | Unit tests | `uv run pytest -q` |
-| End-to-end | `uv run osprey examples --place Taiwan -o /tmp/osprey.csv` → DSC06266 Brown Booby soft, DSC07300 Bridled Tern sharp, DSC07714 Bulwer's Petrel sharp; all exposure ok |
+| End-to-end | `rm -rf /tmp/osprey-e2e && cp -R examples /tmp/osprey-e2e && uv run osprey /tmp/osprey-e2e` → DSC06266 Brown Booby `soft/`, DSC07300 Bridled Tern `sharp/`, DSC07714 Bulwer's Petrel `sharp/` (copy first: osprey moves files) |
 
 `examples/` photos are local only (gitignored, 56 MB).
 

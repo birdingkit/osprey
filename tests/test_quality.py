@@ -3,7 +3,7 @@ from PIL import Image
 from scipy.ndimage import gaussian_filter
 
 from osprey.detect import Bird
-from osprey.quality import clipped_pct, exposure_label, quality_label, sharpness
+from osprey.quality import bird_sharpness, quality_label, sharpness
 
 
 def _checkerboard(contrast: float) -> np.ndarray:
@@ -42,15 +42,8 @@ def test_qualityLabel_cutoffs():
     assert quality_label(30.0) == "blurry"
 
 
-def test_exposureLabel_flagsClippedPlumage():
-    assert exposure_label(1.6, 0.0) == "over"
-    assert exposure_label(0.0, 16.1) == "under"
-    assert exposure_label(0.0, 5.6) == "ok"
-    assert exposure_label(1.0, 10.0) == "ok"
-
-
-def test_clippedPct_countsBlownAndCrushedBirdPixels():
-    pixels = np.full((10, 10, 3), 128, dtype=np.uint8)
-    pixels[0, :] = 255  # 10 of 100 blown
-    pixels[1:3, :] = 0  # 20 of 100 crushed
-    assert clipped_pct(Image.fromarray(pixels), _bird((0, 0, 10, 10), (10, 10))) == (10.0, 20.0)
+def test_birdSharpness_largeBird_judgedAtMaxSide():
+    # trace: 2048 px box → resized to 1024 before scoring; a checkerboard stays sharp
+    pixels = np.kron(_checkerboard(contrast=100), np.ones((8, 8))).astype(np.uint8)
+    image = Image.fromarray(pixels).convert("RGB")
+    assert bird_sharpness(image, _bird((0, 0, 2048, 2048), (2048, 2048))) > 60

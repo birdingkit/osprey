@@ -16,16 +16,6 @@ class Bird:
     box: tuple[int, int, int, int]  # x0, y0, x1, y1 in full-resolution pixels
     mask: np.ndarray  # bool, box-sized
 
-    @property
-    def area(self) -> int:
-        return int(self.mask.sum())
-
-    def within(self, crop_box: tuple[int, int, int, int]) -> "Bird":
-        """The same bird in the coordinates of an image cropped to `crop_box`."""
-        dx, dy = crop_box[0], crop_box[1]
-        x0, y0, x1, y1 = self.box
-        return Bird((x0 - dx, y0 - dy, x1 - dx, y1 - dy), self.mask)
-
 
 class BirdDetector:
     def __init__(self, device: torch.device):
@@ -47,20 +37,26 @@ class BirdDetector:
         return to_tensor(small), scale
 
     @torch.inference_mode()
-    def __call__(self, shrunk: tuple[torch.Tensor, float]) -> list[Bird]:
-        """Birds found in a `shrink`-ed photo, boxes and masks in full-resolution pixels."""
+    def __call__(self, shrunk: tuple[torch.Tensor, float]) -> Bird | None:
+        """Largest bird in a `shrink`-ed photo, box and mask in full-resolution pixels."""
         x, scale = shrunk
         out = self.model([x.to(self.device)])[0]
-        birds = []
+        best, best_area = None, 0
         for box, label, mask in zip(out["boxes"], out["labels"], out["masks"]):
             if label != self.bird_label:
                 continue
             x0, y0, x1, y1 = (round(v) for v in box.tolist())
             if x1 - x0 < 2 or y1 - y0 < 2:
                 continue
-            small_mask = mask[0, y0:y1, x0:x1].cpu().numpy()
-            full_box = tuple(round(v / scale) for v in (x0, y0, x1, y1))
-            full_size = (full_box[2] - full_box[0], full_box[3] - full_box[1])
-            full_mask = np.asarray(Image.fromarray(small_mask).resize(full_size, Image.BILINEAR)) > 0.5
-            birds.append(Bird(full_box, full_mask))
-        return sorted(birds, key=lambda b: b.area, reverse=True)
+            area = int((mask[0, y0:y1, x0:x1] > 0.5).sum())
+            if area > best_area:
+                best, best_area = (x0, y0, x1, y1, mask), area
+        if best is None:
+            return None
+        # Only the chosen bird's mask is upsampled to full resolution.
+        x0, y0, x1, y1, mask = best
+        small_mask = mask[0, y0:y1, x0:x1].cpu().numpy()
+        full_box = tuple(round(v / scale) for v in (x0, y0, x1, y1))
+        full_size = (full_box[2] - full_box[0], full_box[3] - full_box[1])
+        full_mask = np.asarray(Image.fromarray(small_mask).resize(full_size, Image.BILINEAR)) > 0.5
+        return Bird(full_box, full_mask)

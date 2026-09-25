@@ -1,15 +1,13 @@
 [project]
 name = "osprey"
 version = "0.1.0"
-description = "Sort bird photos by species (BioCLIP 2.5 + iNaturalist local species) and sharpness into a CSV"
+description = "Move bird photos into sharp / soft / blurry / no_bird folders by the sharpness of the bird"
 authors = [
     { name = "siansiansu" }
 ]
 requires-python = ">=3.13"
 dependencies = [
-    "open-clip-torch==3.3.0",
     "pillow==12.3.0",
-    "requests==2.34.2",
     "scipy==1.18.1",
     "torch==2.11.0",
     "torchvision==0.26.0",
