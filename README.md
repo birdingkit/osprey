@@ -12,7 +12,7 @@ cd osprey
 uv sync
 ```
 
-The first run downloads the detector and segmenter (about 700 MB).
+The first run downloads the detector and segmenter (about 800 MB).
 
 ## Use
 
@@ -40,8 +40,16 @@ The letter prefix keeps the folders in best-first order in Finder.
 
 Files sharing the photo's name move with it: `DSC0001.JPG`, `DSC0001.ARW` and `DSC0001.ARW.xmp` stay together.
 
+osprey moves files, it never deletes them. To undo, move the photos back out of the four folders.
+
 ## How it works
 
 [OWL-ViT](https://huggingface.co/google/owlvit-base-patch32) finds birds, dolphins and whales from text prompts, and [SAM 2](https://huggingface.co/facebook/sam2.1-hiera-tiny) outlines the largest one. Sharpness uses the re-blur metric of Crete et al. (2007) on the animal's pixels, so a soft background does not count against the photo.
 
 A photo takes about 0.5 s on an M4 Mac.
+
+## Limits
+
+- Only birds, dolphins and whales are looked for. Add more names to `ANIMALS` in `src/osprey/detect.py`.
+- Very faint or distant animals, such as a pale seabird soaring against grey sky, can land in `D_no_animal`. Check that folder before deleting anything.
+- The sharpness cut-offs were set on a handful of Sony A7 IV frames and may need adjusting for other cameras or subjects.
